@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="機械ツール">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>機械設計ツール</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one narrow work column — input card on top, result sheet + tolerance-zone diagram below; like a 検査成績書 */
+:root{
+  --bg:#eef1f3; --paper:#ffffff; --ink:#18232c; --muted:#5a6873; --line:#cfd7dd;
+  --accent:#1f5f8b; --accent-soft:#dbe8f1;
+  --hole:#2c6fa3; --shaft:#c46a1b;
+  --ok:#2d7d46; --warn:#a86a00; --bad:#b23a3a;
+  --sans:"IBM Plex Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171c; --paper:#1a232a; --ink:#e3e9ee; --muted:#93a2ad; --line:#2e3b45;
+  --accent:#6fb0dd; --accent-soft:#1e3445; --hole:#6fb0dd; --shaft:#e59a55;
+  --ok:#5fbf7c; --warn:#e0a83a; --bad:#e07272; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11171c; --paper:#1a232a; --ink:#e3e9ee; --muted:#93a2ad; --line:#2e3b45;
+  --accent:#6fb0dd; --accent-soft:#1e3445; --hole:#6fb0dd; --shaft:#e59a55;
+  --ok:#5fbf7c; --warn:#e0a83a; --bad:#e07272; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:20px;margin:0;font-weight:700;letter-spacing:.02em}
+h1 small{font-weight:400;color:var(--muted);font-size:13px;margin-left:8px}
+nav{display:flex;gap:6px;flex-wrap:wrap}
+nav span{font-size:12px;padding:4px 10px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+nav span.on{background:var(--accent);border-color:var(--accent);color:var(--paper)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:16px;display:flex;flex-direction:column;gap:14px}
+h2{font-size:13px;margin:0;color:var(--muted);font-weight:500;letter-spacing:.08em}
+.inputs{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px}
+@media (max-width:520px){.inputs{grid-template-columns:1fr 1fr}.inputs .dia{grid-column:1/-1}}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.pair{display:flex;gap:4px}
+input,select{font:500 18px var(--mono);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%;min-width:0}
+input:focus,select:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.presets button{font:500 13px var(--mono);background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:5px 9px;cursor:pointer}
+.presets button:hover{border-color:var(--accent)}
+.presets button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.fitline{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.code{font:600 26px var(--mono);letter-spacing:.01em}
+.pill{font-size:13px;font-weight:700;padding:4px 12px;border-radius:999px;border:1.5px solid currentColor}
+.pill.clearance{color:var(--ok)}.pill.transition{color:var(--warn)}.pill.interference{color:var(--bad)}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{font-size:12px;color:var(--muted);font-weight:500}
+td{font-family:var(--mono);font-size:15px}
+td.lab{font-family:var(--sans);font-size:13px;color:var(--muted)}
+.h{color:var(--hole);font-weight:600}.s{color:var(--shaft);font-weight:600}
+.fitnums{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.fitnums div{border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.fitnums b{display:block;font:600 22px var(--mono)}
+.fitnums span{font-size:12px;color:var(--muted)}
+svg text{font-family:var(--mono)}
+.err{color:var(--bad);font-size:14px}
+.note{font-size:12px;color:var(--muted);line-height:1.7}
+.note p{margin:0}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>機械設計ツール<small>はめあい計算</small></h1>
+  <nav><span class="on">はめあい</span><span>ねじ（準備中）</span><span>材料（準備中）</span></nav>
+</header>
+
+<section class="card">
+  <h2>入力</h2>
+  <div class="inputs">
+    <label class="dia" for="d">図示サイズ（基準寸法） mm<input id="d" type="number" inputmode="decimal" min="0.1" max="500" step="any" value="50"></label>
+    <label>穴<div class="pair"><select id="hl"></select><select id="hg"></select></div></label>
+    <label>軸<div class="pair"><select id="sl"></select><select id="sg"></select></div></label>
+  </div>
+  <div>
+    <h2 style="margin-bottom:8px">よく使うはめあい（穴基準）</h2>
+    <div class="presets" id="presets"></div>
+  </div>
+</section>
+
+<section class="card" id="out"></section>
+
+<section class="card note">
+  <h2>計算根拠</h2>
+  <p>ISO 286-1:2010（JIS B 0401-1:2016 と同等）の基本公差 IT と基礎となる許容差の表・規則に基づいて計算しています。対応範囲：図示サイズ 0〜500 mm、穴 D〜S／軸 d〜s。</p>
+  <p>穴の K・M・N（IT8以下）と P〜S（IT7以下）には補正値 Δ = ITn − IT(n−1) を加えています。M6（250〜315 mm）は規格の特例値 −9 µm を使用。</p>
+  <p>JS・js は ±IT/2 で表示しています（奇数 µm の場合は ±x.5）。</p>
+  <p>境界寸法は上側の区分に含みます（例：Ø30 は「18 を超え 30 以下」）。</p>
+  <p><b>試作版です。</b>重要な図面では JIS 規格票の値と照合してください。</p>
+</section>
+</div>
+
+<script>
+// ===== ISO 286-1:2010 / JIS B 0401-1:2016 — 0 < D ≤ 500 mm =====
+const RANGES=[3,6,10,18,30,50,80,120,180,250,315,400,500];
+const IT={1:[0.8,1,1,1.2,1.5,1.5,2,2.5,3.5,4.5,6,7,8],2:[1.2,1.5,1.5,2,2.5,2.5,3,4,5,7,8,9,10],3:[2,2.5,2.5,3,4,4,5,6,8,10,12,13,15],4:[3,4,4,5,6,7,8,10,12,14,16,18,20],5:[4,5,6,8,9,11,13,15,18,20,23,25,27],6:[6,8,9,11,13,16,19,22,25,29,32,36,40],7:[10,12,15,18,21,25,30,35,40,46,52,57,63],8:[14,18,22,27,33,39,46,54,63,72,81,89,97],9:[25,30,36,43,52,62,74,87,100,115,130,140,155],10:[40,48,58,70,84,100,120,140,160,185,210,230,250],11:[60,75,90,110,130,160,190,220,250,290,320,360,400],12:[100,120,150,180,210,250,300,350,400,460,520,570,630],13:[140,180,220,270,330,390,460,540,630,720,810,890,970],14:[250,300,360,430,520,620,740,870,1000,1150,1300,1400,1550],15:[400,480,580,700,840,1000,1200,1400,1600,1850,2100,2300,2500],16:[600,750,900,1100,1300,1600,1900,2200,2500,2900,3200,3600,4000]};
+// shaft fundamental deviations (µm) per main range
+const SH={d:[-20,-30,-40,-50,-65,-80,-100,-120,-145,-170,-190,-210,-230],e:[-14,-20,-25,-32,-40,-50,-60,-72,-85,-100,-110,-125,-135],f:[-6,-10,-13,-16,-20,-25,-30,-36,-43,-50,-56,-62,-68],g:[-2,-4,-5,-6,-7,-9,-10,-12,-14,-15,-17,-18,-20],h:[0,0,0,0,0,0,0,0,0,0,0,0,0],k:[0,1,1,1,2,2,2,3,3,4,4,4,5],m:[2,4,6,7,8,9,11,13,15,17,20,21,23],n:[4,8,10,12,15,17,20,23,27,31,34,37,40],p:[6,12,15,18,22,26,32,37,43,50,56,62,68]};
+// r, s: sub-ranges above 50 mm
+const SUB=[[3,6,10,18,30,50,65,80,100,120,140,160,180,200,225,250,280,315,355,400,450,500]];
+const RS={r:[10,15,19,23,28,34,41,43,51,54,63,65,68,77,80,84,94,98,108,114,126,132],s:[14,19,23,28,35,43,53,59,71,79,92,100,108,122,130,140,158,170,190,208,232,252]};
+const SUBR=SUB[0];
+function idx(arr,D){for(let i=0;i<arr.length;i++){if(D<=arr[i])return i;}return -1;}
+function rangeOf(D){const i=idx(RANGES,D);return i<0?null:{i,lo:i?RANGES[i-1]:0,hi:RANGES[i]};}
+function itv(g,D){const r=rangeOf(D);return IT[g][r.i];}
+function shaftEi(L,D){const j=idx(SUBR,D);return RS[L][j];}
+// returns {upper, lower} in µm, or {error}
+function shaft(L,g,D){
+  const r=rangeOf(D); if(!r) return {error:'寸法は 0 < D ≤ 500 mm の範囲で入力してください'};
+  if(!IT[g]) return {error:'等級が範囲外です'};
+  const t=IT[g][r.i];
+  if(L==='js') return {upper:t/2,lower:-t/2,it:t};
+  if('defgh'.includes(L)&&L.length===1){const es=SH[L][r.i];return {upper:es,lower:es-t,it:t};}
+  let ei;
+  if(L==='k'){ei=(g>=4&&g<=7)?SH.k[r.i]:0; if(D<=3) ei=0;}
+  else if(L==='m'||L==='n'||L==='p') ei=SH[L][r.i];
+  else if(L==='r'||L==='s') ei=shaftEi(L,D);
+  else return {error:'未対応の公差域'};
+  return {upper:ei+t,lower:ei,it:t};
+}
+function delta(g,D){ if(D<=3||g<2||g>8) return 0; return itv(g,D)-itv(g-1,D);} // Δ = ITn − IT(n−1)
+function hole(L,g,D){
+  const r=rangeOf(D); if(!r) return {error:'寸法は 0 < D ≤ 500 mm の範囲で入力してください'};
+  if(!IT[g]) return {error:'等級が範囲外です'};
+  const t=IT[g][r.i];
+  if(L==='JS') return {upper:t/2,lower:-t/2,it:t};
+  const l=L.toLowerCase();
+  if('DEFGH'.includes(L)){const EI=-SH[l][r.i];return {upper:EI+t,lower:EI,it:t};}
+  let ES;
+  if(L==='K'){ if(g>8) return {error:'K は IT8 以下のみ対応（IT8超は規格上の扱いが異なるため）'};
+    ES = D<=3?0:-SH.k[r.i]+delta(g,D);}
+  else if(L==='M'){ if(g>8) return {error:'M は IT8 以下のみ対応'};
+    ES = D<=3?-2:-SH.m[r.i]+delta(g,D);
+    if(g===6&&D>250&&D<=315) ES=-9; // ISO 286-1 特例
+  }
+  else if(L==='N'){ ES = D<=3?-4:(g<=8?-SH.n[r.i]+delta(g,D):0);}
+  else if('PRS'.includes(L)){ const ei = L==='P'?SH.p[r.i]:shaftEi(l,D); ES = -ei + (g<=7?delta(g,D):0);}
+  else return {error:'未対応の公差域'};
+  return {upper:ES,lower:ES-t,it:t};
+}
+function fit(D,H,S){
+  const maxC=H.upper-S.lower, minC=H.lower-S.upper;
+  let type = minC>=0?'clearance':(maxC<=0?'interference':'transition');
+  return {maxC,minC,type};
+}
+
+
+const HL=['D','E','F','G','H','JS','K','M','N','P','R','S'], SL=['d','e','f','g','h','js','k','m','n','p','r','s'];
+const PRE=[['H7','g6'],['H7','h6'],['H7','js6'],['H7','k6'],['H7','m6'],['H7','n6'],['H7','p6'],['H7','r6'],['H7','s6'],['H7','f7'],['H8','e8'],['H9','d9'],['H6','g5'],['H6','h5']];
+const $=id=>document.getElementById(id);
+function fill(sel,arr){sel.innerHTML=arr.map(v=>`<option>${v}</option>`).join('');}
+fill($('hl'),HL);fill($('sl'),SL);
+const G=[];for(let i=1;i<=16;i++)G.push(i);fill($('hg'),G);fill($('sg'),G);
+$('hl').value='H';$('hg').value='7';$('sl').value='g';$('sg').value='6';
+$('presets').innerHTML=PRE.map(([h,s])=>`<button type="button" data-h="${h}" data-s="${s}">${h}/${s}</button>`).join('');
+$('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  const sp=x=>[x.replace(/\d+/,''),x.replace(/\D+/,'')];
+  const [a,b1]=sp(b.dataset.h),[c,d]=sp(b.dataset.s);
+  $('hl').value=a;$('hg').value=b1;$('sl').value=c;$('sg').value=d;calc();});
+['d','hl','hg','sl','sg'].forEach(id=>$(id).addEventListener('input',calc));
+
+const um=v=>(v>0?'+':v<0?'−':'±')+Math.abs(v).toString().replace(/\.0+$/,'');
+const mm=v=>{const s=v.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');return s.includes('.')&&s.split('.')[1].length<3?v.toFixed(3):s;};
+const TYPE={clearance:'すきまばめ',transition:'中間ばめ',interference:'しまりばめ'};
+
+function diagram(H,S){
+  const vals=[H.upper,H.lower,S.upper,S.lower,0];const mx=Math.max(...vals),mn=Math.min(...vals);
+  const pad=(mx-mn)*0.12||5,top=mx+pad,bot=mn-pad,h=220,W=360;
+  const y=v=>12+(top-v)/(top-bot)*(h-24);
+  const box=(x,a,b,c,lab)=>`<rect x="${x}" y="${y(a)}" width="70" height="${Math.max(2,y(b)-y(a))}" fill="${c}" fill-opacity=".22" stroke="${c}" stroke-width="1.5"/>
+   <text x="${x+78}" y="${y(a)+4}" font-size="12" fill="${c}">${um(a)}</text><text x="${x+78}" y="${y(b)+4}" font-size="12" fill="${c}">${um(b)}</text>
+   <text x="${x+35}" y="${Math.min(h-4,y(b)+16)}" font-size="12" text-anchor="middle" fill="${c}" font-weight="600">${lab}</text>`;
+  return `<svg viewBox="0 0 ${W} ${h+6}" width="100%" style="max-width:460px" role="img" aria-label="公差域図">
+   <line x1="0" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="var(--muted)" stroke-dasharray="4 3"/>
+   <text x="2" y="${y(0)-5}" font-size="11" fill="var(--muted)">0 線</text>
+   ${box(110,H.upper,H.lower,'var(--hole)','穴')}${box(245,S.upper,S.lower,'var(--shaft)','軸')}</svg>`;
+}
+function calc(){
+  const D=parseFloat($('d').value),hl=$('hl').value,hg=+$('hg').value,sl=$('sl').value,sg=+$('sg').value;
+  document.querySelectorAll('#presets button').forEach(b=>b.classList.toggle('on',b.dataset.h===hl+hg&&b.dataset.s===sl+sg));
+  const out=$('out');
+  if(!(D>0&&D<=500)){out.innerHTML='<h2>結果</h2><p class="err">図示サイズは 0 を超え 500 mm 以下で入力してください。</p>';return;}
+  const H=hole(hl,hg,D),S=shaft(sl,sg,D);
+  if(H.error||S.error){out.innerHTML=`<h2>結果</h2><p class="err">${H.error||S.error}</p>`;return;}
+  const F=fit(D,H,S),r=rangeOf(D);
+  const row=(n,cls,X)=>`<tr><td class="${cls}">${n}</td><td>${um(X.upper)}</td><td>${um(X.lower)}</td><td>${X.it}</td><td>${mm(D+X.upper/1000)}</td><td>${mm(D+X.lower/1000)}</td></tr>`;
+  let nums='';
+  if(F.type==='clearance') nums=`<div><span>最大すきま</span><b>${F.maxC} µm</b></div><div><span>最小すきま</span><b>${F.minC} µm</b></div>`;
+  else if(F.type==='interference') nums=`<div><span>最大しめしろ</span><b>${-F.minC} µm</b></div><div><span>最小しめしろ</span><b>${-F.maxC} µm</b></div>`;
+  else nums=`<div><span>最大すきま</span><b>${F.maxC} µm</b></div><div><span>最大しめしろ</span><b>${-F.minC} µm</b></div>`;
+  out.innerHTML=`<h2>結果 — 寸法区分 ${r.lo} を超え ${r.hi} 以下</h2>
+  <div class="fitline"><span class="code">Ø${D} ${hl}${hg}/${sl}${sg}</span><span class="pill ${F.type}">${TYPE[F.type]}</span></div>
+  <div class="tblwrap"><table><thead><tr><th></th><th>上の許容差 µm</th><th>下の許容差 µm</th><th>公差 µm</th><th>上の許容サイズ mm</th><th>下の許容サイズ mm</th></tr></thead>
+  <tbody>${row('穴 '+hl+hg,'h',H)}${row('軸 '+sl+sg,'s',S)}</tbody></table></div>
+  <div class="fitnums">${nums}</div>
+  ${diagram(H,S)}`;
+}
+calc();
+</script>
+<script>if('serviceWorker' in navigator){addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));}</script>
+</body>
+</html>
